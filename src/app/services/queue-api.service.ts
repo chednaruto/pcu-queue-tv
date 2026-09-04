@@ -5,18 +5,17 @@ import { CallingResponse, DisplaySettings, StatsResponse } from '../models/queue
 @Injectable({ providedIn: 'root' })
 export class QueueApiService {
   async getCalling(settings: DisplaySettings): Promise<CallingResponse> {
-    const depcodes = this.visibleDepartmentCodes(settings);
+    const depcodes = this.activeDepcodes(settings);
     if (!depcodes) return { success: true, queues: [] };
-    const limit = String(Math.max(6, Math.min(18, this.visibleDepartmentCount(settings) * 3)));
     return this.post<CallingResponse>(settings, {
       action: 'calling',
       depcode: depcodes,
-      limit
+      limit: '6'
     });
   }
 
   async getStats(settings: DisplaySettings): Promise<StatsResponse> {
-    const depcodes = this.visibleDepartmentCodes(settings);
+    const depcodes = this.activeDepcodes(settings);
     return this.post<StatsResponse>(settings, {
       action: 'stats',
       depcode: depcodes
@@ -27,18 +26,12 @@ export class QueueApiService {
     return this.post<Record<string, unknown>>(settings, { action: 'health' });
   }
 
-  private visibleDepartmentCodes(settings: DisplaySettings): string {
-    const count = this.visibleDepartmentCount(settings);
+  private activeDepcodes(settings: DisplaySettings): string {
     return settings.departments
-      .slice(0, count)
+      .slice(0, settings.displayDepartmentCount)
       .map(d => d.code.trim())
       .filter(Boolean)
       .join(',');
-  }
-
-  private visibleDepartmentCount(settings: DisplaySettings): number {
-    const count = Number(settings.departmentCount || 1);
-    return Math.min(6, Math.max(1, Math.round(Number.isFinite(count) ? count : 1)));
   }
 
   private async post<T>(settings: DisplaySettings, params: Record<string, string>): Promise<T> {
