@@ -13,6 +13,7 @@ export interface DisplaySettings {
   voiceEnabled: boolean;
   announcePatientName: boolean;
   ttsRate: number;
+  departmentCount: number;
   departments: DepartmentConfig[];
   notices: string[];
   marquee: string;
