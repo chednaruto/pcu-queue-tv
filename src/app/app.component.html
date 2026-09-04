@@ -22,15 +22,19 @@
     <main class="content">
       <section class="queue-panel glass">
         <div class="section-header">
-          <div class="panel-title">กำลังเรียกคิว</div>
+          <div>
+            <div class="panel-title">กำลังเรียกคิว</div>
+            <div class="department-count-label">แสดง {{ displayCount }} แผนก</div>
+          </div>
           <div class="stats-row">
             <div class="stat-chip"><span>ผู้รับบริการวันนี้</span><strong>{{ stats.totalvisit }}</strong></div>
             <div class="stat-chip waiting"><span>รอรับบริการ</span><strong>{{ stats.waiting }}</strong></div>
           </div>
         </div>
 
-        <div class="queue-grid" [style.--card-count]="settings.departments.length">
-          <article class="queue-card" *ngFor="let dep of settings.departments" [class.active]="isActive(dep.code)" [class.unconfigured]="!dep.code">
+        <div class="queue-grid" [attr.data-count]="displayCount">
+          <article class="queue-card" *ngFor="let dep of visibleDepartments; let i = index" [class.active]="isActive(dep.code)" [class.unconfigured]="!dep.code">
+            <div class="department-index">{{ i + 1 }}</div>
             <div class="queue-number">{{ queueFor(dep.code) }}</div>
             <div class="service-name">{{ dep.name }}</div>
             <div class="dep-code" *ngIf="dep.code">DEP {{ dep.code }}</div>
@@ -91,6 +95,18 @@
       </div>
 
       <div class="settings-scroll">
+        <div class="display-count-setting">
+          <div>
+            <h3>จำนวนแผนกที่ต้องการแสดง</h3>
+            <p>กำหนดเป็นตัวเลข 1–6 ระบบจะปรับรูปแบบหน้าจอและดึงคิวเฉพาะแผนกที่เลือก</p>
+          </div>
+          <input class="focusable department-count-input" type="number" min="1" max="6" step="1" [(ngModel)]="draftSettings.departmentCount">
+        </div>
+
+        <div class="layout-preview" [attr.data-count]="draftSettings.departmentCount">
+          <span *ngFor="let dep of draftSettings.departments; let i = index" [class.enabled]="isDraftDepartmentVisible(i)">{{ i + 1 }}</span>
+        </div>
+
         <div class="form-grid two-col">
           <label>Server Base URL
             <input class="focusable" [(ngModel)]="draftSettings.serverBaseUrl" placeholder="http://192.168.1.100/display">
@@ -120,13 +136,16 @@
 
         <div class="department-editor">
           <div class="editor-title">
-            <h3>จุดบริการ / depcode</h3>
-            <button class="secondary-btn focusable" (click)="addDepartment()">+ เพิ่มจุดบริการ</button>
+            <div>
+              <h3>ตั้งค่าแผนก 1–6 / depcode</h3>
+              <p>แถวสีฟ้าคือแผนกที่จะแสดงตามจำนวนที่กำหนดด้านบน</p>
+            </div>
           </div>
-          <div class="department-row" *ngFor="let dep of draftSettings.departments; let i = index">
+          <div class="department-row" *ngFor="let dep of draftSettings.departments; let i = index" [class.row-enabled]="isDraftDepartmentVisible(i)">
+            <div class="department-number">{{ i + 1 }}</div>
             <input class="dep-input focusable" [(ngModel)]="dep.code" maxlength="10" placeholder="depcode เช่น 010">
-            <input class="name-input focusable" [(ngModel)]="dep.name" placeholder="ชื่อจุดบริการ">
-            <button class="danger-btn focusable" (click)="removeDepartment(i)">ลบ</button>
+            <input class="name-input focusable" [(ngModel)]="dep.name" placeholder="ชื่อแผนก / จุดบริการ">
+            <div class="row-state">{{ isDraftDepartmentVisible(i) ? 'แสดง' : 'ซ่อน' }}</div>
           </div>
         </div>
       </div>
