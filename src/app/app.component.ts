@@ -58,33 +58,56 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get thaiDate(): string {
-    return this.now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+    return this.now.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   get stateLabel(): string {
-    return this.connectionState === 'online' ? 'เชื่อมต่อแล้ว' : this.connectionState === 'offline' ? 'ขาดการเชื่อมต่อ' : 'กำลังเชื่อมต่อ';
-  }
-
-  get displayCount(): number {
-    return this.clampDepartmentCount(this.settings.departmentCount);
+    return this.connectionState === 'online'
+      ? 'เชื่อมต่อแล้ว'
+      : this.connectionState === 'offline'
+        ? 'ขาดการเชื่อมต่อ'
+        : 'กำลังเชื่อมต่อ';
   }
 
   get visibleDepartments(): DepartmentConfig[] {
-    return this.settings.departments.slice(0, this.displayCount);
+    return this.settings.departments.slice(0, this.settings.displayDepartmentCount);
+  }
+
+  get layoutClass(): string {
+    return `layout-${this.visibleDepartments.length}`;
+  }
+
+  get draftDepartments(): DepartmentConfig[] {
+    return this.draftSettings.departments.slice(0, 6);
   }
 
   queueFor(code: string): string {
     if (!code) return '-';
-    const value = this.currentQueues[code]?.oqueue;
-    return value === undefined || value === null || value === '' ? '-' : String(value);
+    return this.formatQueueValue(this.currentQueues[code]?.oqueue);
+  }
+
+  formatQueueValue(value: string | number | undefined | null): string {
+    if (value === undefined || value === null || value === '') return '-';
+    const raw = String(value).trim();
+    return /^\d+$/.test(raw) ? raw.padStart(3, '0') : raw;
   }
 
   isActive(code: string): boolean {
     return !!code && this.activeDepCode === code;
   }
 
-  isDraftDepartmentVisible(index: number): boolean {
-    return index < this.clampDepartmentCount(this.draftSettings.departmentCount);
+  callTimeFor(item: QueueItem): string {
+    const raw = item.sd_queue_calling_datetime;
+    if (!raw) return this.thaiTime;
+    const date = new Date(raw.replace(' ', 'T'));
+    if (Number.isNaN(date.getTime())) return this.thaiTime;
+    return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  departmentNameFor(item: QueueItem): string {
+    const depCode = String(item.sd_queue_calling_curdep || '').trim();
+    const configured = this.settings.departments.find(d => d.code === depCode)?.name;
+    return item.department || configured || depCode || 'จุดบริการ';
   }
 
   openSettings(): void {
@@ -98,32 +121,29 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   saveSettings(): void {
-    this.draftSettings.pollIntervalMs = this.clamp(Number(this.draftSettings.pollIntervalMs), 1000, 30000);
-    this.draftSettings.statsIntervalMs = this.clamp(Number(this.draftSettings.statsIntervalMs), 3000, 60000);
-    this.draftSettings.ttsRate = this.clamp(Number(this.draftSettings.ttsRate), 0.5, 1.5);
-    this.draftSettings.departmentCount = this.clampDepartmentCount(this.draftSettings.departmentCount);
-    this.draftSettings.departments = this.ensureSixDepartments(this.draftSettings.departments);
-    this.settingsService.save(this.draftSettings);
-    this.settings = this.settingsService.load();
-    this.draftSettings = structuredClone(this.settings);
+    this.draftSettings.pollIntervalMs = this.clampNumber(Number(this.draftSettings.pollIntervalMs), 1000, 30000);
+    this.draftSettings.statsIntervalMs = this.clampNumber(Number(this.draftSettings.statsIntervalMs), 3000, 60000);
+    this.draftSettings.ttsRate = this.clampNumber(Number(this.draftSettings.ttsRate), 0.5, 1.5);
+    this.draftSettings.displayDepartmentCount = this.clampInt(Number(this.draftSettings.displayDepartmentCount), 1, 6);
+    this.draftSettings.departments = this.draftSettings.departments.slice(0, 6);
+    this.settings = structuredClone(this.draftSettings);
+    this.settingsService.save(this.settings);
     this.settingsOpen = false;
     this.currentQueues = {};
-    this.recentCalls = [];
     this.activeDepCode = '';
+    this.recentCalls = [];
     this.restartPolling();
   }
 
   resetSettings(): void {
     this.draftSettings = this.settingsService.reset();
-    this.testMessage = 'คืนค่าเริ่มต้นแล้ว กด “บันทึก” เพื่อใช้งาน';
+    this.testMessage = 'คืนค่าเริ่มต้นแล้ว กด “บันทึกและใช้งาน” เพื่อใช้งาน';
   }
 
   async testConnection(): Promise<void> {
     this.testMessage = 'กำลังทดสอบ...';
     try {
-      const testSettings = structuredClone(this.draftSettings);
-      testSettings.departmentCount = this.clampDepartmentCount(testSettings.departmentCount);
-      const result = await this.api.health(testSettings);
+      const result = await this.api.health(this.draftSettings);
       this.testMessage = result['success'] === false ? 'เชื่อมต่อได้ แต่ API แจ้งข้อผิดพลาด' : 'เชื่อมต่อ Server/API สำเร็จ';
     } catch (error) {
       this.testMessage = `เชื่อมต่อไม่สำเร็จ: ${this.errorText(error)}`;
@@ -136,7 +156,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if ((key === 's' || key === 'f2') && !this.settingsOpen) {
       event.preventDefault();
       this.openSettings();
-    } else if (key === 'escape' && this.settingsOpen) {
+    } else if ((key === 'escape' || key === 'backspace') && this.settingsOpen) {
       event.preventDefault();
       this.closeSettings();
     }
@@ -189,16 +209,13 @@ export class AppComponent implements OnInit, OnDestroy {
         };
       }
     } catch {
-      // Calling poll owns the connection status; stats failures are non-fatal.
+      // non-fatal
     }
   }
 
   private async handleCall(item: QueueItem): Promise<void> {
     const depCode = String(item.sd_queue_calling_curdep || '').trim();
     if (!depCode) return;
-
-    const visibleCodes = new Set(this.visibleDepartments.map(d => d.code.trim()).filter(Boolean));
-    if (!visibleCodes.has(depCode)) return;
 
     this.currentQueues[depCode] = item;
     this.currentQueues = { ...this.currentQueues };
@@ -214,26 +231,11 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.seenKeys.length > 100) this.seenKeys.splice(0, this.seenKeys.length - 100);
 
     if (this.settings.voiceEnabled) {
-      const queue = String(item.oqueue ?? '').trim();
-      const configuredName = this.visibleDepartments.find(d => d.code === depCode)?.name;
-      const department = item.department || configuredName || 'จุดบริการ';
+      const queue = this.queueFor(depCode);
+      const department = this.departmentNameFor(item);
       const patient = this.settings.announcePatientName && item.full_namecall ? ` ${item.full_namecall}` : '';
       await this.tts.speak(`ขอเชิญหมายเลข ${queue}${patient} เข้ารับบริการที่ ${department} ค่ะ`, this.settings.ttsRate);
     }
-  }
-
-  private ensureSixDepartments(departments: DepartmentConfig[]): DepartmentConfig[] {
-    return Array.from({ length: 6 }, (_, index) => {
-      const dep = departments[index];
-      return {
-        code: String(dep?.code ?? '').trim(),
-        name: String(dep?.name ?? `จุดบริการ ${index + 1}`).trim() || `จุดบริการ ${index + 1}`
-      };
-    });
-  }
-
-  private clampDepartmentCount(value: number): number {
-    return Math.round(this.clamp(Number(value), 1, 6));
   }
 
   private callKey(item: QueueItem): string {
@@ -249,8 +251,12 @@ export class AppComponent implements OnInit, OnDestroy {
     return error instanceof Error ? error.message : String(error);
   }
 
-  private clamp(value: number, min: number, max: number): number {
+  private clampNumber(value: number, min: number, max: number): number {
     if (!Number.isFinite(value)) return min;
     return Math.min(max, Math.max(min, value));
+  }
+
+  private clampInt(value: number, min: number, max: number): number {
+    return Math.round(this.clampNumber(value, min, max));
   }
 }
