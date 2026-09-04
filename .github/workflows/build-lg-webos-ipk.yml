@@ -24,12 +24,19 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install webOS tooling
+      - name: Install webOS CLI
         run: |
           npm install -g @webos-tools/cli@3.2.5
-          npm install --no-save webostvjs@1.2.13
           ares-config --profile tv
           ares -V
+
+      - name: Fetch webOSTV.js library
+        run: |
+          TGZ=$(npm pack webostvjs@1.2.13 --silent)
+          mkdir -p .webos-lib
+          tar -xzf "$TGZ" -C .webos-lib package/webOSTV.js
+          cp .webos-lib/package/webOSTV.js webos-app/webOSTV.js
+          rm -rf .webos-lib "$TGZ"
 
       - name: Prepare webOS app assets
         run: node scripts/prepare-webos.mjs
