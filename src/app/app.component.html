@@ -1,85 +1,140 @@
 <ion-app>
   <div class="tv-shell">
-    <header class="header glass">
-      <div class="brand-block">
+    <header class="header-shell">
+      <div class="brand-emblem">
+        <div class="emblem-inner">
+          <div class="emblem-top">กระทรวงสาธารณสุข</div>
+          <div class="emblem-icon">⚕</div>
+          <div class="emblem-bottom">MINISTRY OF PUBLIC HEALTH</div>
+        </div>
+      </div>
+
+      <div class="title-block">
         <div class="hospital-name">{{ settings.hospitalName }}</div>
         <div class="hospital-subtitle">{{ settings.hospitalSubtitle }}</div>
       </div>
 
-      <div class="header-right">
-        <div class="connection-pill" [class.online]="connectionState === 'online'" [class.offline]="connectionState === 'offline'">
-          <span class="status-dot"></span>
-          <span>{{ stateLabel }}</span>
-        </div>
-        <div class="clock">
-          <div class="clock-time">{{ thaiTime }}</div>
-          <div class="clock-date">{{ thaiDate }}</div>
-        </div>
-        <button class="settings-btn focusable" (click)="openSettings()" title="ตั้งค่า (กด S หรือ F2)">⚙</button>
+      <div class="header-spacer"></div>
+
+      <div class="connection-pill" [class.online]="connectionState === 'online'" [class.offline]="connectionState === 'offline'">
+        <ion-icon name="checkmark-circle"></ion-icon>
+        <span>{{ stateLabel }}</span>
       </div>
+
+      <div class="clock-block">
+        <div class="clock-time">{{ thaiTime }}</div>
+        <div class="clock-date">{{ thaiDate }}</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <button class="settings-btn focusable" (click)="openSettings()" title="ตั้งค่า (กด S หรือ F2)">
+        <ion-icon name="settings"></ion-icon>
+      </button>
     </header>
 
-    <main class="content">
-      <section class="queue-panel glass">
-        <div class="section-header">
-          <div>
-            <div class="panel-title">กำลังเรียกคิว</div>
-            <div class="department-count-label">แสดง {{ displayCount }} แผนก</div>
+    <main class="content-shell">
+      <section class="queue-panel glass-panel">
+        <div class="queue-panel-header">
+          <div class="queue-title-group">
+            <div class="title-icon"><ion-icon name="megaphone"></ion-icon></div>
+            <div class="queue-title">กำลังเรียกคิว</div>
           </div>
+
           <div class="stats-row">
-            <div class="stat-chip"><span>ผู้รับบริการวันนี้</span><strong>{{ stats.totalvisit }}</strong></div>
-            <div class="stat-chip waiting"><span>รอรับบริการ</span><strong>{{ stats.waiting }}</strong></div>
+            <div class="stat-chip">
+              <ion-icon name="people"></ion-icon>
+              <div class="stat-content">
+                <span>ผู้รับบริการวันนี้</span>
+                <strong>{{ stats.totalvisit }}</strong>
+              </div>
+            </div>
+            <div class="stat-chip waiting">
+              <ion-icon name="time"></ion-icon>
+              <div class="stat-content">
+                <span>รอรับบริการ</span>
+                <strong>{{ stats.waiting }}</strong>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="queue-grid" [attr.data-count]="displayCount">
-          <article class="queue-card" *ngFor="let dep of visibleDepartments; let i = index" [class.active]="isActive(dep.code)" [class.unconfigured]="!dep.code">
-            <div class="department-index">{{ i + 1 }}</div>
+        <div class="queue-grid" [ngClass]="layoutClass">
+          <article class="queue-card" *ngFor="let dep of visibleDepartments" [class.active]="isActive(dep.code)" [class.unconfigured]="!dep.code">
+            <div class="card-icon left" *ngIf="dep.icon">
+              <ion-icon [name]="dep.icon"></ion-icon>
+            </div>
+            <div class="card-icon right active-speaker" *ngIf="isActive(dep.code)">
+              <ion-icon name="volume-high"></ion-icon>
+            </div>
+
             <div class="queue-number">{{ queueFor(dep.code) }}</div>
             <div class="service-name">{{ dep.name }}</div>
-            <div class="dep-code" *ngIf="dep.code">DEP {{ dep.code }}</div>
-            <div class="dep-code" *ngIf="!dep.code">ยังไม่กำหนด depcode</div>
+            <div class="dep-label" *ngIf="dep.code">DEP {{ dep.code }}</div>
+            <div class="dep-label" *ngIf="!dep.code">ยังไม่กำหนด depcode</div>
+            <div class="calling-badge" *ngIf="isActive(dep.code)">กำลังเรียกคิว</div>
           </article>
         </div>
       </section>
 
       <aside class="right-panel">
-        <section class="promo-panel glass">
-          <div class="panel-title">ประชาสัมพันธ์</div>
-          <div class="image-placeholder">
-            <div class="hospital-image generated-promo" aria-hidden="true"><div class="promo-cross">+</div><div class="promo-heart">♥</div></div>
-            <div class="image-overlay">
-              <div class="overlay-title">บริการด้วยใจ ใกล้บ้าน ใกล้ชุมชน</div>
-              <div class="overlay-subtitle">{{ settings.hospitalSubtitle }}</div>
+        <section class="promo-panel glass-panel">
+          <div class="sidebar-title"><span class="sidebar-icon"><ion-icon name="megaphone"></ion-icon></span>ประชาสัมพันธ์</div>
+          <div class="promo-board">
+            <div class="promo-sky"></div>
+            <div class="promo-text-top">บริการด้วยใจ</div>
+            <div class="promo-text-sub">ใกล้บ้าน ใกล้ชุมชน</div>
+            <div class="promo-heart">♡</div>
+            <div class="promo-line"></div>
+            <div class="promo-hills"></div>
+            <div class="promo-road"></div>
+            <div class="promo-trees left"></div>
+            <div class="promo-trees right"></div>
+            <div class="promo-hospital">
+              <div class="building-main"></div>
+              <div class="building-side"></div>
+              <div class="building-cross">✚</div>
+              <div class="windows"></div>
             </div>
           </div>
         </section>
 
-        <section class="announce-panel glass">
-          <div class="panel-title small-title">ประกาศ / คิวล่าสุด</div>
+        <section class="announce-panel glass-panel">
+          <div class="sidebar-title"><span class="sidebar-icon"><ion-icon name="document-text"></ion-icon></span>ประกาศ / คิวล่าสุด</div>
           <div class="announce-list" *ngIf="recentCalls.length; else noticeBlock">
-            <div class="announce-item recent" *ngFor="let item of recentCalls">
-              <strong>คิว {{ item.oqueue }}</strong>
-              <span>{{ item.department || item.sd_queue_calling_curdep }}</span>
+            <div class="announce-item" *ngFor="let item of recentCalls">
+              <div class="announce-left">
+                <span class="announce-bullet"><ion-icon name="volume-medium"></ion-icon></span>
+                <span>คิว {{ formatQueueValue(item.oqueue) }} - {{ departmentNameFor(item) }}</span>
+              </div>
+              <div class="announce-time">{{ callTimeFor(item) }}</div>
             </div>
           </div>
           <ng-template #noticeBlock>
             <div class="announce-list">
-              <div class="announce-item" *ngFor="let notice of settings.notices">{{ notice }}</div>
+              <div class="announce-item notice" *ngFor="let notice of settings.notices; let i = index">
+                <div class="announce-left">
+                  <span class="announce-bullet warning"><ion-icon [name]="i === 0 ? 'warning' : 'information-circle'"></ion-icon></span>
+                  <span>{{ notice }}</span>
+                </div>
+              </div>
             </div>
           </ng-template>
+          <div class="all-queue-link">
+            <span>ดูคิวทั้งหมด</span>
+            <ion-icon name="chevron-forward"></ion-icon>
+          </div>
         </section>
       </aside>
     </main>
 
-    <footer class="footer glass">
-      <div class="marquee">{{ settings.marquee }}</div>
+    <footer class="footer-shell glass-panel">
+      <div class="footer-icon"><ion-icon name="volume-high"></ion-icon></div>
+      <div class="footer-arrow">❯❯❯</div>
+      <div class="footer-marquee">{{ settings.marquee }}</div>
+      <div class="footer-arrow right">❯❯❯</div>
+      <div class="footer-brand">Powered by <strong>X-Health</strong></div>
     </footer>
-
-    <div class="credit">
-      <span>Powered By X-Health</span>
-      <span class="xhealth-badge">X-Health</span>
-    </div>
 
     <div class="connection-error" *ngIf="connectionState === 'offline'">{{ connectionMessage }}</div>
   </div>
@@ -89,24 +144,12 @@
       <div class="settings-header">
         <div>
           <h2>ตั้งค่า Android TV Queue Display</h2>
-          <p>เปิดหน้านี้ได้ด้วยปุ่ม S / F2 • ปิดด้วย Esc/Back</p>
+          <p>ยึดรูปแบบหน้าจอจริงจากแบบ 3 แผนก และ 6 แผนก • เปิดด้วย S / F2</p>
         </div>
-        <button class="icon-btn focusable" (click)="closeSettings()">✕</button>
+        <button class="icon-btn focusable" (click)="closeSettings()"><ion-icon name="close"></ion-icon></button>
       </div>
 
       <div class="settings-scroll">
-        <div class="display-count-setting">
-          <div>
-            <h3>จำนวนแผนกที่ต้องการแสดง</h3>
-            <p>กำหนดเป็นตัวเลข 1–6 ระบบจะปรับรูปแบบหน้าจอและดึงคิวเฉพาะแผนกที่เลือก</p>
-          </div>
-          <input class="focusable department-count-input" type="number" min="1" max="6" step="1" [(ngModel)]="draftSettings.departmentCount">
-        </div>
-
-        <div class="layout-preview" [attr.data-count]="draftSettings.departmentCount">
-          <span *ngFor="let dep of draftSettings.departments; let i = index" [class.enabled]="isDraftDepartmentVisible(i)">{{ i + 1 }}</span>
-        </div>
-
         <div class="form-grid two-col">
           <label>Server Base URL
             <input class="focusable" [(ngModel)]="draftSettings.serverBaseUrl" placeholder="http://192.168.1.100/display">
@@ -120,32 +163,34 @@
           <label>ชื่อหน่วยบริการ
             <input class="focusable" [(ngModel)]="draftSettings.hospitalSubtitle">
           </label>
+          <label>จำนวนแผนกที่ต้องการแสดง (1-6)
+            <input class="focusable" type="number" min="1" max="6" [(ngModel)]="draftSettings.displayDepartmentCount">
+          </label>
           <label>Poll คิว (ms)
             <input class="focusable" type="number" [(ngModel)]="draftSettings.pollIntervalMs">
           </label>
           <label>Poll สถิติ (ms)
             <input class="focusable" type="number" [(ngModel)]="draftSettings.statsIntervalMs">
           </label>
+          <label>TTS rate
+            <input class="focusable" type="number" step="0.05" min="0.5" max="1.5" [(ngModel)]="draftSettings.ttsRate">
+          </label>
         </div>
 
         <div class="toggle-row">
           <label><input class="focusable" type="checkbox" [(ngModel)]="draftSettings.voiceEnabled"> เปิดเสียงเรียกคิว Android TTS</label>
           <label><input class="focusable" type="checkbox" [(ngModel)]="draftSettings.announcePatientName"> อ่านชื่อผู้รับบริการในเสียงเรียก</label>
-          <label>TTS rate <input class="focusable small-number" type="number" step="0.05" min="0.5" max="1.5" [(ngModel)]="draftSettings.ttsRate"></label>
         </div>
 
         <div class="department-editor">
           <div class="editor-title">
-            <div>
-              <h3>ตั้งค่าแผนก 1–6 / depcode</h3>
-              <p>แถวสีฟ้าคือแผนกที่จะแสดงตามจำนวนที่กำหนดด้านบน</p>
-            </div>
+            <h3>กำหนดแผนก 1 - 6</h3>
+            <span>ระบบจะแสดงเฉพาะลำดับที่ 1 ถึง {{ draftSettings.displayDepartmentCount || 1 }}</span>
           </div>
-          <div class="department-row" *ngFor="let dep of draftSettings.departments; let i = index" [class.row-enabled]="isDraftDepartmentVisible(i)">
-            <div class="department-number">{{ i + 1 }}</div>
+          <div class="department-row" *ngFor="let dep of draftDepartments; let i = index">
+            <div class="row-index">{{ i + 1 }}</div>
             <input class="dep-input focusable" [(ngModel)]="dep.code" maxlength="10" placeholder="depcode เช่น 010">
-            <input class="name-input focusable" [(ngModel)]="dep.name" placeholder="ชื่อแผนก / จุดบริการ">
-            <div class="row-state">{{ isDraftDepartmentVisible(i) ? 'แสดง' : 'ซ่อน' }}</div>
+            <input class="name-input focusable" [(ngModel)]="dep.name" placeholder="ชื่อจุดบริการ">
           </div>
         </div>
       </div>
