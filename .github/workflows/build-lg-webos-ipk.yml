@@ -1,0 +1,73 @@
+name: Build LG webOS IPK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'webos-app/**'
+      - 'scripts/prepare-webos.mjs'
+      - '.github/workflows/build-lg-webos-ipk.yml'
+
+jobs:
+  build-webos-ipk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install webOS tooling
+        run: |
+          npm install -g @webos-tools/cli@3.2.5
+          npm install --no-save webostvjs@1.2.13
+          ares-config --profile tv
+          ares -V
+
+      - name: Prepare webOS app assets
+        run: node scripts/prepare-webos.mjs
+
+      - name: Validate webOS app metadata
+        run: |
+          test -f webos-app/appinfo.json
+          test -f webos-app/index.html
+          test -f webos-app/icon.png
+          test -f webos-app/largeIcon.png
+          test -f webos-app/webOSTV.js
+          ares-package --check webos-app
+
+      - name: Package LG webOS app
+        run: |
+          rm -rf webos-output
+          mkdir -p webos-output
+          ares-package --no-minify -o webos-output webos-app
+          ls -lah webos-output
+
+      - name: Rename IPK
+        run: |
+          IPK=$(find webos-output -maxdepth 1 -type f -name '*.ipk' | head -n 1)
+          test -n "$IPK"
+          cp "$IPK" PCU-Queue-LG-webOS-v1.0.ipk
+
+      - name: Verify package info
+        run: ares-package -i PCU-Queue-LG-webOS-v1.0.ipk
+
+      - name: Calculate SHA-256
+        run: sha256sum PCU-Queue-LG-webOS-v1.0.ipk > PCU-Queue-LG-webOS-v1.0.ipk.sha256.txt
+
+      - name: Upload webOS IPK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCU-Queue-LG-webOS-v1.0-IPK
+          path: |
+            PCU-Queue-LG-webOS-v1.0.ipk
+            PCU-Queue-LG-webOS-v1.0.ipk.sha256.txt
+          if-no-files-found: error
+          retention-days: 30
