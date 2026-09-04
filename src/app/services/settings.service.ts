@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { DisplaySettings } from '../models/queue.models';
+import { DepartmentConfig, DisplaySettings } from '../models/queue.models';
 
 const STORAGE_KEY = 'pcu-queue-tv-settings-v1';
 
@@ -13,11 +13,14 @@ export const DEFAULT_SETTINGS: DisplaySettings = {
   voiceEnabled: true,
   announcePatientName: false,
   ttsRate: 0.92,
+  departmentCount: 4,
   departments: [
     { code: '010', name: 'จุดคัดกรอง' },
     { code: '018', name: 'ห้องตรวจโรค 1' },
     { code: '030', name: 'ห้องจ่ายยาผู้ป่วยนอก' },
-    { code: '', name: 'ห้องเจาะเลือด' }
+    { code: '', name: 'ห้องเจาะเลือด' },
+    { code: '', name: 'จุดบริการ 5' },
+    { code: '', name: 'จุดบริการ 6' }
   ],
   notices: [
     'กรุณาสวมหน้ากากอนามัยขณะรับบริการ',
@@ -37,7 +40,8 @@ export class SettingsService {
       return {
         ...structuredClone(DEFAULT_SETTINGS),
         ...saved,
-        departments: saved.departments?.length ? saved.departments : structuredClone(DEFAULT_SETTINGS.departments),
+        departmentCount: this.clampDepartmentCount(saved.departmentCount ?? DEFAULT_SETTINGS.departmentCount),
+        departments: this.normalizeDepartments(saved.departments),
         notices: saved.notices?.length ? saved.notices : structuredClone(DEFAULT_SETTINGS.notices)
       };
     } catch {
@@ -46,11 +50,33 @@ export class SettingsService {
   }
 
   save(settings: DisplaySettings): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    const normalized: DisplaySettings = {
+      ...settings,
+      departmentCount: this.clampDepartmentCount(settings.departmentCount),
+      departments: this.normalizeDepartments(settings.departments)
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   }
 
   reset(): DisplaySettings {
     localStorage.removeItem(STORAGE_KEY);
     return structuredClone(DEFAULT_SETTINGS);
+  }
+
+  private normalizeDepartments(saved?: DepartmentConfig[]): DepartmentConfig[] {
+    const defaults = structuredClone(DEFAULT_SETTINGS.departments);
+    return Array.from({ length: 6 }, (_, index) => {
+      const value = saved?.[index] ?? defaults[index];
+      return {
+        code: String(value?.code ?? '').trim(),
+        name: String(value?.name ?? defaults[index]?.name ?? `จุดบริการ ${index + 1}`).trim() || `จุดบริการ ${index + 1}`
+      };
+    });
+  }
+
+  private clampDepartmentCount(value: number): number {
+    const count = Number(value);
+    if (!Number.isFinite(count)) return 4;
+    return Math.min(6, Math.max(1, Math.round(count)));
   }
 }
