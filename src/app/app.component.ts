@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
-import { DisplaySettings, QueueItem, QueueStats } from './models/queue.models';
+import { DepartmentConfig, DisplaySettings, QueueItem, QueueStats } from './models/queue.models';
 import { QueueApiService } from './services/queue-api.service';
 import { SettingsService } from './services/settings.service';
 import { TtsService } from './services/tts.service';
@@ -65,6 +65,14 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.connectionState === 'online' ? 'เชื่อมต่อแล้ว' : this.connectionState === 'offline' ? 'ขาดการเชื่อมต่อ' : 'กำลังเชื่อมต่อ';
   }
 
+  get displayCount(): number {
+    return this.clampDepartmentCount(this.settings.departmentCount);
+  }
+
+  get visibleDepartments(): DepartmentConfig[] {
+    return this.settings.departments.slice(0, this.displayCount);
+  }
+
   queueFor(code: string): string {
     if (!code) return '-';
     const value = this.currentQueues[code]?.oqueue;
@@ -73,6 +81,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   isActive(code: string): boolean {
     return !!code && this.activeDepCode === code;
+  }
+
+  isDraftDepartmentVisible(index: number): boolean {
+    return index < this.clampDepartmentCount(this.draftSettings.departmentCount);
   }
 
   openSettings(): void {
@@ -89,11 +101,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.draftSettings.pollIntervalMs = this.clamp(Number(this.draftSettings.pollIntervalMs), 1000, 30000);
     this.draftSettings.statsIntervalMs = this.clamp(Number(this.draftSettings.statsIntervalMs), 3000, 60000);
     this.draftSettings.ttsRate = this.clamp(Number(this.draftSettings.ttsRate), 0.5, 1.5);
-    this.draftSettings.departments = this.draftSettings.departments.slice(0, 8);
-    this.settings = structuredClone(this.draftSettings);
-    this.settingsService.save(this.settings);
+    this.draftSettings.departmentCount = this.clampDepartmentCount(this.draftSettings.departmentCount);
+    this.draftSettings.departments = this.ensureSixDepartments(this.draftSettings.departments);
+    this.settingsService.save(this.draftSettings);
+    this.settings = this.settingsService.load();
+    this.draftSettings = structuredClone(this.settings);
     this.settingsOpen = false;
     this.currentQueues = {};
+    this.recentCalls = [];
     this.activeDepCode = '';
     this.restartPolling();
   }
@@ -106,21 +121,13 @@ export class AppComponent implements OnInit, OnDestroy {
   async testConnection(): Promise<void> {
     this.testMessage = 'กำลังทดสอบ...';
     try {
-      const result = await this.api.health(this.draftSettings);
-      this.testMessage = result['success'] === false ? `เชื่อมต่อได้ แต่ API แจ้งข้อผิดพลาด` : 'เชื่อมต่อ Server/API สำเร็จ';
+      const testSettings = structuredClone(this.draftSettings);
+      testSettings.departmentCount = this.clampDepartmentCount(testSettings.departmentCount);
+      const result = await this.api.health(testSettings);
+      this.testMessage = result['success'] === false ? 'เชื่อมต่อได้ แต่ API แจ้งข้อผิดพลาด' : 'เชื่อมต่อ Server/API สำเร็จ';
     } catch (error) {
       this.testMessage = `เชื่อมต่อไม่สำเร็จ: ${this.errorText(error)}`;
     }
-  }
-
-  addDepartment(): void {
-    if (this.draftSettings.departments.length >= 8) return;
-    this.draftSettings.departments.push({ code: '', name: 'จุดบริการใหม่' });
-  }
-
-  removeDepartment(index: number): void {
-    if (this.draftSettings.departments.length <= 1) return;
-    this.draftSettings.departments.splice(index, 1);
   }
 
   @HostListener('window:keydown', ['$event'])
@@ -190,10 +197,13 @@ export class AppComponent implements OnInit, OnDestroy {
     const depCode = String(item.sd_queue_calling_curdep || '').trim();
     if (!depCode) return;
 
+    const visibleCodes = new Set(this.visibleDepartments.map(d => d.code.trim()).filter(Boolean));
+    if (!visibleCodes.has(depCode)) return;
+
     this.currentQueues[depCode] = item;
     this.currentQueues = { ...this.currentQueues };
     this.activeDepCode = depCode;
-    this.recentCalls = [item, ...this.recentCalls.filter(x => this.callKey(x) !== this.callKey(item))].slice(0, 4);
+    this.recentCalls = [item, ...this.recentCalls.filter(x => this.callKey(x) !== this.callKey(item))].slice(0, 6);
 
     if (this.clearActiveTimer) window.clearTimeout(this.clearActiveTimer);
     this.clearActiveTimer = window.setTimeout(() => this.activeDepCode = '', 12000);
@@ -205,11 +215,25 @@ export class AppComponent implements OnInit, OnDestroy {
 
     if (this.settings.voiceEnabled) {
       const queue = String(item.oqueue ?? '').trim();
-      const configuredName = this.settings.departments.find(d => d.code === depCode)?.name;
+      const configuredName = this.visibleDepartments.find(d => d.code === depCode)?.name;
       const department = item.department || configuredName || 'จุดบริการ';
       const patient = this.settings.announcePatientName && item.full_namecall ? ` ${item.full_namecall}` : '';
       await this.tts.speak(`ขอเชิญหมายเลข ${queue}${patient} เข้ารับบริการที่ ${department} ค่ะ`, this.settings.ttsRate);
     }
+  }
+
+  private ensureSixDepartments(departments: DepartmentConfig[]): DepartmentConfig[] {
+    return Array.from({ length: 6 }, (_, index) => {
+      const dep = departments[index];
+      return {
+        code: String(dep?.code ?? '').trim(),
+        name: String(dep?.name ?? `จุดบริการ ${index + 1}`).trim() || `จุดบริการ ${index + 1}`
+      };
+    });
+  }
+
+  private clampDepartmentCount(value: number): number {
+    return Math.round(this.clamp(Number(value), 1, 6));
   }
 
   private callKey(item: QueueItem): string {
