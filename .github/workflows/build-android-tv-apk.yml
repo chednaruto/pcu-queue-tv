@@ -1,9 +1,13 @@
-name: Build Android TV APK
+name: Build Android TV APK v1.2
 
 on:
   workflow_dispatch:
   push:
     branches: [ main, master ]
+
+concurrency:
+  group: android-tv-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-apk:
@@ -35,8 +39,13 @@ jobs:
       - name: Build Ionic web app
         run: npm run build
 
+      - name: Verify Angular web output
+        run: test -f www/browser/index.html
+
       - name: Create Android Capacitor project
-        run: npx cap add android
+        run: |
+          rm -rf android
+          npx cap add android
 
       - name: Sync Capacitor and apply Android TV configuration
         run: npm run cap:sync
@@ -48,12 +57,17 @@ jobs:
           ./gradlew assembleDebug --stacktrace
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk PCU-Queue-Android-TV-v1.1-debug.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk PCU-Queue-Android-TV-v1.2-debug.apk
+
+      - name: Calculate SHA-256
+        run: sha256sum PCU-Queue-Android-TV-v1.2-debug.apk > PCU-Queue-Android-TV-v1.2-debug.sha256.txt
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PCU-Queue-Android-TV-v1.1-APK
-          path: PCU-Queue-Android-TV-v1.1-debug.apk
+          name: PCU-Queue-Android-TV-v1.2-APK
+          path: |
+            PCU-Queue-Android-TV-v1.2-debug.apk
+            PCU-Queue-Android-TV-v1.2-debug.sha256.txt
           if-no-files-found: error
           retention-days: 30
