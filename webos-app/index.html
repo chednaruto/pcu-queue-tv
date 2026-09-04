@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>PCU Queue Display - LG webOS</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="webOSTV.js"></script>
+</head>
+<body>
+  <div id="app" class="tv-shell">
+    <header class="header-shell">
+      <div class="brand-emblem"><div class="emblem-inner"><div class="emblem-top">กระทรวงสาธารณสุข</div><div class="emblem-icon">⚕</div><div class="emblem-bottom">MINISTRY OF PUBLIC HEALTH</div></div></div>
+      <div class="title-block"><div id="hospitalName" class="hospital-name"></div><div id="hospitalSubtitle" class="hospital-subtitle"></div></div>
+      <div class="header-spacer"></div>
+      <div id="connectionPill" class="connection-pill"><span class="status-dot"></span><span id="connectionText">กำลังเชื่อมต่อ</span></div>
+      <div class="clock-block"><div id="clockTime" class="clock-time">--:--:--</div><div id="clockDate" class="clock-date">--</div></div>
+      <div class="divider"></div>
+      <button id="settingsBtn" class="settings-btn focusable" title="ตั้งค่า">⚙</button>
+    </header>
+
+    <main class="content-shell">
+      <section class="queue-panel glass-panel">
+        <div class="queue-panel-header">
+          <div class="queue-title-group"><div class="title-icon">📣</div><div class="queue-title">กำลังเรียกคิว</div></div>
+          <div class="stats-row">
+            <div class="stat-chip"><div class="stat-icon">👥</div><div><span>ผู้รับบริการวันนี้</span><strong id="statTotal">0</strong></div></div>
+            <div class="stat-chip waiting"><div class="stat-icon">◷</div><div><span>รอรับบริการ</span><strong id="statWaiting">0</strong></div></div>
+          </div>
+        </div>
+        <div id="queueGrid" class="queue-grid"></div>
+      </section>
+
+      <aside class="right-panel">
+        <section class="promo-panel glass-panel">
+          <div class="sidebar-title"><span class="sidebar-icon">📣</span>ประชาสัมพันธ์</div>
+          <div class="promo-board">
+            <div class="promo-text-top">บริการด้วยใจ</div>
+            <div class="promo-text-sub">ใกล้บ้าน ใกล้ชุมชน</div>
+            <div class="promo-heart">♡ ──♥── ♡</div>
+            <div class="hills"></div>
+            <div class="road"></div>
+            <div class="tree tree-left">♣</div><div class="tree tree-right">♣</div>
+            <div class="hospital-art"><div class="hospital-roof"></div><div class="hospital-body"><div class="hospital-cross">✚</div><div class="hospital-windows">▦ ▦ ▦<br>▦ ▦ ▦</div></div></div>
+          </div>
+        </section>
+        <section class="announce-panel glass-panel">
+          <div class="sidebar-title"><span class="sidebar-icon">▤</span>ประกาศ / คิวล่าสุด</div>
+          <div id="announceList" class="announce-list"></div>
+          <div class="all-queue-link">ดูคิวทั้งหมด <span>›</span></div>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="footer-shell glass-panel">
+      <div class="footer-icon">🔊</div><div class="footer-arrow">❯❯❯</div><div id="marqueeText" class="footer-marquee"></div><div class="footer-arrow right">❯❯❯</div><div class="footer-brand">Powered by <strong>X-Health</strong></div>
+    </footer>
+    <div id="connectionError" class="connection-error hidden"></div>
+  </div>
+
+  <div id="settingsOverlay" class="settings-overlay hidden">
+    <div class="settings-card">
+      <div class="settings-header"><div><h2>ตั้งค่า LG webOS Queue Display</h2><p>กดปุ่มสีเหลืองบน Magic Remote เพื่อเปิดตั้งค่า • Back เพื่อปิด</p></div><button id="closeSettingsBtn" class="icon-btn focusable">✕</button></div>
+      <div class="settings-scroll">
+        <div class="form-grid two-col">
+          <label>Server Base URL<input id="sServer" class="focusable" type="text"></label>
+          <label>API Path<input id="sApiPath" class="focusable" type="text"></label>
+          <label>ชื่อระบบ<input id="sHospitalName" class="focusable" type="text"></label>
+          <label>ชื่อหน่วยบริการ<input id="sHospitalSubtitle" class="focusable" type="text"></label>
+          <label>จำนวนแผนกที่แสดง (1-6)<input id="sCount" class="focusable" type="number" min="1" max="6"></label>
+          <label>Poll คิว (ms)<input id="sPoll" class="focusable" type="number"></label>
+          <label>Poll สถิติ (ms)<input id="sStatsPoll" class="focusable" type="number"></label>
+          <label>TTS rate<input id="sTtsRate" class="focusable" type="number" step="0.05" min="0.5" max="1.5"></label>
+        </div>
+        <div class="toggle-row"><label><input id="sVoice" type="checkbox"> เปิดเสียงเรียกคิว</label><label><input id="sPatient" type="checkbox"> อ่านชื่อผู้รับบริการ</label></div>
+        <div class="department-editor"><div class="editor-title"><h3>กำหนดแผนก 1 - 6</h3><span id="countHint"></span></div><div id="departmentRows"></div></div>
+      </div>
+      <div class="settings-footer"><div id="testMessage" class="test-message"></div><div class="actions"><button id="resetBtn" class="secondary-btn focusable">คืนค่าเริ่มต้น</button><button id="testBtn" class="secondary-btn focusable">ทดสอบเชื่อมต่อ</button><button id="saveBtn" class="primary-btn focusable">บันทึกและใช้งาน</button></div></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
