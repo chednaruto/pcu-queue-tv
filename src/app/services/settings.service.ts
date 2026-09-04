@@ -1,33 +1,35 @@
 import { Injectable } from '@angular/core';
 import { DepartmentConfig, DisplaySettings } from '../models/queue.models';
 
-const STORAGE_KEY = 'pcu-queue-tv-settings-v1';
+const STORAGE_KEY = 'pcu-queue-tv-settings-v2';
+
+const DEFAULT_DEPARTMENTS: DepartmentConfig[] = [
+  { code: '010', name: 'จุดคัดกรอง', icon: 'shield-outline' },
+  { code: '018', name: 'ห้องตรวจโรค 1', icon: 'medkit-outline' },
+  { code: '019', name: 'ห้องตรวจโรค 2', icon: 'clipboard-outline' },
+  { code: '030', name: 'ห้องจ่ายยาผู้ป่วยนอก', icon: 'medical-outline' },
+  { code: '040', name: 'ห้องเจาะเลือด', icon: 'flask-outline' },
+  { code: '050', name: 'ห้องทันตกรรม', icon: 'sparkles-outline' }
+];
 
 export const DEFAULT_SETTINGS: DisplaySettings = {
   serverBaseUrl: 'http://192.168.1.100/display',
   apiPath: 'api/queue-tv.php',
   hospitalName: 'ระบบแสดงคิวผู้รับบริการ',
   hospitalSubtitle: 'โรงพยาบาลส่งเสริมสุขภาพตำบล',
+  displayDepartmentCount: 3,
   pollIntervalMs: 3000,
   statsIntervalMs: 10000,
   voiceEnabled: true,
   announcePatientName: false,
   ttsRate: 0.92,
-  departmentCount: 4,
-  departments: [
-    { code: '010', name: 'จุดคัดกรอง' },
-    { code: '018', name: 'ห้องตรวจโรค 1' },
-    { code: '030', name: 'ห้องจ่ายยาผู้ป่วยนอก' },
-    { code: '', name: 'ห้องเจาะเลือด' },
-    { code: '', name: 'จุดบริการ 5' },
-    { code: '', name: 'จุดบริการ 6' }
-  ],
+  departments: DEFAULT_DEPARTMENTS,
   notices: [
     'กรุณาสวมหน้ากากอนามัยขณะรับบริการ',
     'โปรดเตรียมบัตรประชาชนก่อนเข้ารับบริการ',
     'กรุณารอฟังเสียงเรียกคิวจากระบบ'
   ],
-  marquee: 'ยินดีต้อนรับเข้าสู่ระบบบริการอัตโนมัติ กรุณารอฟังเสียงเรียกคิวและติดตามหน้าจอแสดงผล • Welcome to Queue Management System'
+  marquee: 'ยินดีต้อนรับเข้าสู่ระบบบริการอัตโนมัติ กรุณารอฟังเสียงเรียกคิวและติดตามหน้าจอแสดงผล'
 };
 
 @Injectable({ providedIn: 'root' })
@@ -37,11 +39,12 @@ export class SettingsService {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return structuredClone(DEFAULT_SETTINGS);
       const saved = JSON.parse(raw) as Partial<DisplaySettings>;
+      const departments = this.normalizeDepartments(saved.departments);
       return {
         ...structuredClone(DEFAULT_SETTINGS),
         ...saved,
-        departmentCount: this.clampDepartmentCount(saved.departmentCount ?? DEFAULT_SETTINGS.departmentCount),
-        departments: this.normalizeDepartments(saved.departments),
+        displayDepartmentCount: this.normalizeCount(saved.displayDepartmentCount),
+        departments,
         notices: saved.notices?.length ? saved.notices : structuredClone(DEFAULT_SETTINGS.notices)
       };
     } catch {
@@ -52,7 +55,7 @@ export class SettingsService {
   save(settings: DisplaySettings): void {
     const normalized: DisplaySettings = {
       ...settings,
-      departmentCount: this.clampDepartmentCount(settings.departmentCount),
+      displayDepartmentCount: this.normalizeCount(settings.displayDepartmentCount),
       departments: this.normalizeDepartments(settings.departments)
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
@@ -63,20 +66,18 @@ export class SettingsService {
     return structuredClone(DEFAULT_SETTINGS);
   }
 
-  private normalizeDepartments(saved?: DepartmentConfig[]): DepartmentConfig[] {
-    const defaults = structuredClone(DEFAULT_SETTINGS.departments);
-    return Array.from({ length: 6 }, (_, index) => {
-      const value = saved?.[index] ?? defaults[index];
-      return {
-        code: String(value?.code ?? '').trim(),
-        name: String(value?.name ?? defaults[index]?.name ?? `จุดบริการ ${index + 1}`).trim() || `จุดบริการ ${index + 1}`
-      };
-    });
+  private normalizeCount(value: unknown): number {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return DEFAULT_SETTINGS.displayDepartmentCount;
+    return Math.min(6, Math.max(1, Math.round(n)));
   }
 
-  private clampDepartmentCount(value: number): number {
-    const count = Number(value);
-    if (!Number.isFinite(count)) return 4;
-    return Math.min(6, Math.max(1, Math.round(count)));
+  private normalizeDepartments(value: unknown): DepartmentConfig[] {
+    const list = Array.isArray(value) ? value as Partial<DepartmentConfig>[] : [];
+    const merged = DEFAULT_DEPARTMENTS.map((dep, index) => ({
+      ...dep,
+      ...(list[index] || {})
+    }));
+    return merged.slice(0, 6);
   }
 }
