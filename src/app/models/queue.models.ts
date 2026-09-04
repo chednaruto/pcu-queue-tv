@@ -1,6 +1,7 @@
 export interface DepartmentConfig {
   code: string;
   name: string;
+  icon?: string;
 }
 
 export interface DisplaySettings {
@@ -8,12 +9,12 @@ export interface DisplaySettings {
   apiPath: string;
   hospitalName: string;
   hospitalSubtitle: string;
+  displayDepartmentCount: number;
   pollIntervalMs: number;
   statsIntervalMs: number;
   voiceEnabled: boolean;
   announcePatientName: boolean;
   ttsRate: number;
-  departmentCount: number;
   departments: DepartmentConfig[];
   notices: string[];
   marquee: string;
