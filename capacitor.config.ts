@@ -3,8 +3,6 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'th.go.xhealth.pcuqueuedisplay',
   appName: 'PCU Queue Display',
-  // Angular 20 application builder writes browser assets under www/browser.
-  // Capacitor must point to the directory that directly contains index.html.
   webDir: 'www/browser',
   server: {
     androidScheme: 'http',
@@ -12,7 +10,7 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: true,
-    backgroundColor: '#0f172a'
+    backgroundColor: '#071225'
   },
   plugins: {
     CapacitorHttp: {
