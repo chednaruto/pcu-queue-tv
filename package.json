@@ -1,15 +1,16 @@
 {
   "name": "pcu-queue-android-tv",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
-  "description": "Ionic + Capacitor Android TV queue display converted from pcu-screen.php",
+  "description": "Ionic + Capacitor Android TV queue display for 1-6 departments",
   "scripts": {
     "start": "ng serve",
     "build": "ng build",
     "cap:add:android": "npx cap add android",
     "cap:sync": "npm run build && npx cap sync android && node scripts/configure-android-tv.mjs",
     "android:open": "npx cap open android",
-    "android:prepare": "npm run cap:sync"
+    "android:prepare": "npm run cap:sync",
+    "apk:debug": "npm run build && npx cap add android && npm run cap:sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "@angular/animations": "20.3.30",
@@ -23,16 +24,16 @@
     "@capacitor/android": "^7.0.0",
     "@capacitor/core": "^7.0.0",
     "@ionic/angular": "^8.0.0",
-    "ionicons": "^7.4.0",
+    "ionicons": "7.4.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.8.0",
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "20.3.36",
-    "@angular/cli": "^20.3.0",
+    "@angular/cli": "20.3.36",
     "@angular/compiler-cli": "20.3.30",
     "@capacitor/cli": "^7.0.0",
-    "typescript": "~5.8.3"
+    "typescript": "5.8.3"
   }
 }
