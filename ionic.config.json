@@ -1,0 +1,5 @@
+{
+  "name": "PCU Queue Android TV",
+  "integrations": {"capacitor": {}},
+  "type": "angular"
+}
