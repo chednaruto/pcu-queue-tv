@@ -1,0 +1,16 @@
+{
+  "id": "th.go.xhealth.pcuqueuedisplay",
+  "version": "1.0.0",
+  "vendor": "X-Health",
+  "type": "web",
+  "main": "index.html",
+  "title": "PCU Queue Display",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "appDescription": "PCU queue display for 1-6 departments",
+  "resolution": "1920x1080",
+  "bgColor": "#071225",
+  "iconColor": "#0b2f78",
+  "disableBackHistoryAPI": true,
+  "transparent": false
+}
