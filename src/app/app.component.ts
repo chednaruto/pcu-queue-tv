@@ -1,0 +1,232 @@
+import { CommonModule } from '@angular/common';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { IonicModule } from '@ionic/angular';
+import { DisplaySettings, QueueItem, QueueStats } from './models/queue.models';
+import { QueueApiService } from './services/queue-api.service';
+import { SettingsService } from './services/settings.service';
+import { TtsService } from './services/tts.service';
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [CommonModule, FormsModule, IonicModule],
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.scss']
+})
+export class AppComponent implements OnInit, OnDestroy {
+  settings: DisplaySettings;
+  draftSettings: DisplaySettings;
+  now = new Date();
+  settingsOpen = false;
+  connectionState: 'online' | 'offline' | 'checking' = 'checking';
+  connectionMessage = 'กำลังเชื่อมต่อ';
+  currentQueues: Record<string, QueueItem> = {};
+  recentCalls: QueueItem[] = [];
+  activeDepCode = '';
+  stats: QueueStats = { totalvisit: 0, waiting: 0 };
+  testMessage = '';
+
+  private clockTimer?: number;
+  private pollTimer?: number;
+  private statsTimer?: number;
+  private clearActiveTimer?: number;
+  private pollBusy = false;
+  private seenKeys: string[] = [];
+
+  constructor(
+    private readonly api: QueueApiService,
+    private readonly settingsService: SettingsService,
+    private readonly tts: TtsService
+  ) {
+    this.settings = this.settingsService.load();
+    this.draftSettings = structuredClone(this.settings);
+  }
+
+  ngOnInit(): void {
+    this.clockTimer = window.setInterval(() => this.now = new Date(), 1000);
+    this.restartPolling();
+  }
+
+  ngOnDestroy(): void {
+    this.stopTimers();
+    void this.tts.stop();
+  }
+
+  get thaiTime(): string {
+    return this.now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  get thaiDate(): string {
+    return this.now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  get stateLabel(): string {
+    return this.connectionState === 'online' ? 'เชื่อมต่อแล้ว' : this.connectionState === 'offline' ? 'ขาดการเชื่อมต่อ' : 'กำลังเชื่อมต่อ';
+  }
+
+  queueFor(code: string): string {
+    if (!code) return '-';
+    const value = this.currentQueues[code]?.oqueue;
+    return value === undefined || value === null || value === '' ? '-' : String(value);
+  }
+
+  isActive(code: string): boolean {
+    return !!code && this.activeDepCode === code;
+  }
+
+  openSettings(): void {
+    this.draftSettings = structuredClone(this.settings);
+    this.testMessage = '';
+    this.settingsOpen = true;
+  }
+
+  closeSettings(): void {
+    this.settingsOpen = false;
+  }
+
+  saveSettings(): void {
+    this.draftSettings.pollIntervalMs = this.clamp(Number(this.draftSettings.pollIntervalMs), 1000, 30000);
+    this.draftSettings.statsIntervalMs = this.clamp(Number(this.draftSettings.statsIntervalMs), 3000, 60000);
+    this.draftSettings.ttsRate = this.clamp(Number(this.draftSettings.ttsRate), 0.5, 1.5);
+    this.draftSettings.departments = this.draftSettings.departments.slice(0, 8);
+    this.settings = structuredClone(this.draftSettings);
+    this.settingsService.save(this.settings);
+    this.settingsOpen = false;
+    this.currentQueues = {};
+    this.activeDepCode = '';
+    this.restartPolling();
+  }
+
+  resetSettings(): void {
+    this.draftSettings = this.settingsService.reset();
+    this.testMessage = 'คืนค่าเริ่มต้นแล้ว กด “บันทึก” เพื่อใช้งาน';
+  }
+
+  async testConnection(): Promise<void> {
+    this.testMessage = 'กำลังทดสอบ...';
+    try {
+      const result = await this.api.health(this.draftSettings);
+      this.testMessage = result['success'] === false ? `เชื่อมต่อได้ แต่ API แจ้งข้อผิดพลาด` : 'เชื่อมต่อ Server/API สำเร็จ';
+    } catch (error) {
+      this.testMessage = `เชื่อมต่อไม่สำเร็จ: ${this.errorText(error)}`;
+    }
+  }
+
+  addDepartment(): void {
+    if (this.draftSettings.departments.length >= 8) return;
+    this.draftSettings.departments.push({ code: '', name: 'จุดบริการใหม่' });
+  }
+
+  removeDepartment(index: number): void {
+    if (this.draftSettings.departments.length <= 1) return;
+    this.draftSettings.departments.splice(index, 1);
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent): void {
+    const key = event.key.toLowerCase();
+    if ((key === 's' || key === 'f2') && !this.settingsOpen) {
+      event.preventDefault();
+      this.openSettings();
+    } else if (key === 'escape' && this.settingsOpen) {
+      event.preventDefault();
+      this.closeSettings();
+    }
+  }
+
+  private restartPolling(): void {
+    this.stopPollingTimers();
+    void this.pollCalling();
+    void this.pollStats();
+    this.pollTimer = window.setInterval(() => void this.pollCalling(), this.settings.pollIntervalMs);
+    this.statsTimer = window.setInterval(() => void this.pollStats(), this.settings.statsIntervalMs);
+  }
+
+  private stopTimers(): void {
+    if (this.clockTimer) window.clearInterval(this.clockTimer);
+    this.stopPollingTimers();
+  }
+
+  private stopPollingTimers(): void {
+    if (this.pollTimer) window.clearInterval(this.pollTimer);
+    if (this.statsTimer) window.clearInterval(this.statsTimer);
+    if (this.clearActiveTimer) window.clearTimeout(this.clearActiveTimer);
+  }
+
+  private async pollCalling(): Promise<void> {
+    if (this.pollBusy) return;
+    this.pollBusy = true;
+    try {
+      const result = await this.api.getCalling(this.settings);
+      if (!result.success) throw new Error(result.message || 'API returned success=false');
+      this.setOnline();
+      for (const item of result.queues || []) {
+        await this.handleCall(item);
+      }
+    } catch (error) {
+      this.connectionState = 'offline';
+      this.connectionMessage = this.errorText(error);
+    } finally {
+      this.pollBusy = false;
+    }
+  }
+
+  private async pollStats(): Promise<void> {
+    try {
+      const result = await this.api.getStats(this.settings);
+      if (result.success && result.stats) {
+        this.stats = {
+          totalvisit: Number(result.stats.totalvisit || 0),
+          waiting: Number(result.stats.waiting || 0)
+        };
+      }
+    } catch {
+      // Calling poll owns the connection status; stats failures are non-fatal.
+    }
+  }
+
+  private async handleCall(item: QueueItem): Promise<void> {
+    const depCode = String(item.sd_queue_calling_curdep || '').trim();
+    if (!depCode) return;
+
+    this.currentQueues[depCode] = item;
+    this.currentQueues = { ...this.currentQueues };
+    this.activeDepCode = depCode;
+    this.recentCalls = [item, ...this.recentCalls.filter(x => this.callKey(x) !== this.callKey(item))].slice(0, 4);
+
+    if (this.clearActiveTimer) window.clearTimeout(this.clearActiveTimer);
+    this.clearActiveTimer = window.setTimeout(() => this.activeDepCode = '', 12000);
+
+    const key = this.callKey(item);
+    if (this.seenKeys.includes(key)) return;
+    this.seenKeys.push(key);
+    if (this.seenKeys.length > 100) this.seenKeys.splice(0, this.seenKeys.length - 100);
+
+    if (this.settings.voiceEnabled) {
+      const queue = String(item.oqueue ?? '').trim();
+      const configuredName = this.settings.departments.find(d => d.code === depCode)?.name;
+      const department = item.department || configuredName || 'จุดบริการ';
+      const patient = this.settings.announcePatientName && item.full_namecall ? ` ${item.full_namecall}` : '';
+      await this.tts.speak(`ขอเชิญหมายเลข ${queue}${patient} เข้ารับบริการที่ ${department} ค่ะ`, this.settings.ttsRate);
+    }
+  }
+
+  private callKey(item: QueueItem): string {
+    return [item.vn || '', item.sd_queue_calling_curdep || '', item.oqueue || '', item.sd_queue_calling_datetime || ''].join('|');
+  }
+
+  private setOnline(): void {
+    this.connectionState = 'online';
+    this.connectionMessage = 'รับข้อมูลจาก Server ปกติ';
+  }
+
+  private errorText(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  private clamp(value: number, min: number, max: number): number {
+    if (!Number.isFinite(value)) return min;
+    return Math.min(max, Math.max(min, value));
+  }
+}
