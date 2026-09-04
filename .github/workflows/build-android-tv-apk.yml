@@ -48,12 +48,12 @@ jobs:
           ./gradlew assembleDebug --stacktrace
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk PCU-Queue-Android-TV-v1.0-debug.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk PCU-Queue-Android-TV-v1.1-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PCU-Queue-Android-TV-APK
-          path: PCU-Queue-Android-TV-v1.0-debug.apk
+          name: PCU-Queue-Android-TV-v1.1-APK
+          path: PCU-Queue-Android-TV-v1.1-debug.apk
           if-no-files-found: error
           retention-days: 30
